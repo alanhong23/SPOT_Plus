@@ -4,13 +4,16 @@ from ultralytics import YOLO
 import threading
 from flask import Flask, render_template, jsonify
 import time
+import queue
+
+frame_queue = queue.Queue(maxsize=1)
 
 # --- FLASK APP SETUP ---
 app = Flask(__name__)
 
 # --- TIMING CONFIGURATION ---
-BUFFER_IN = 10   # Seconds to wait before ADDING a person (Occupation)
-BUFFER_OUT = 30  # Seconds to wait before REMOVING a person (Vacancy)
+BUFFER_IN = 3  # Seconds to wait before ADDING a person (Occupation)
+BUFFER_OUT = 20  # Seconds to wait before REMOVING a person (Vacancy)
 
 # Global variable for the frontend
 occupancy_data = {
@@ -42,8 +45,8 @@ def run_detection():
     cap = cv2.VideoCapture('trim.mp4') 
 
     # Define Areas
-    area_1 = [(76, 337), (215,347), (159, 421), (0,400)]
-    area_2 = [(215,347), (433,352), (403,426), (159, 421)]
+    area_1 = [(76, 337), (215,345), (159, 425), (0,400)]
+    area_2 = [(215,345), (433,345), (403,430), (159, 425)]
     area_3 = [(0,438), (382,463), (371,500), (0,500)]
     area_4 = [(677,346), (690, 380), (1020,360), (1020, 325)]
     area_5 = [(690, 380), (1020,360), (1020, 463), (744,479)]
@@ -120,9 +123,8 @@ def run_detection():
             # Update global data (with capacity clamping from previous fix)
             occupancy_data[key]["count"] = min(state["confirmed_count"], occupancy_data[key]["capacity"])
 
-            cv2.imshow("RGB", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
+        if not frame_queue.full():
+            frame_queue.put(frame)
 # --- FLASK ROUTES ---
 
 @app.route('/')
@@ -133,9 +135,41 @@ def index():
 def status():
     return jsonify(occupancy_data)
 
+def run_flask():
+    # use_reloader=False is important in threads
+    app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)
+
 if __name__ == '__main__':
-    t = threading.Thread(target=run_detection)
-    t.daemon = True
-    t.start()
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # 1. Start Detection Thread
+    t_detect = threading.Thread(target=run_detection)
+    t_detect.daemon = True
+    t_detect.start()
+
+    # 2. Start Flask Thread
+    t_flask = threading.Thread(target=run_flask)
+    t_flask.daemon = True
+    t_flask.start()
+
+    print("System started. Press 'q' to exit.")
+
+    # 3. Main Thread: Handles the Display Loop
+    while True:
+        try:
+            # Get the latest frame from the queue
+            frame = frame_queue.get(timeout=0.1)
+            
+            # Update the window
+            cv2.imshow("RGB", frame)
+            
+            # Required for the window to update and process clicks
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+                
+        except queue.Empty:
+            # If queue is empty temporarily, just continue looping
+            continue
+
+    cv2.destroyAllWindows()
+
+    
         
