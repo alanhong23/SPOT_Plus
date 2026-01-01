@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Occupancy Monitor</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        /* --- RESPONSIVE CONTAINER --- */
+        .room-container {
+            /* Width adjusts to screen, but stops at 1000px */
+            width: 95%; 
+            max-width: 1000px; 
+            
+            /* Magic trick: Keeps the box ratio locked to 900:500 (1.8) */
+            aspect-ratio: 1.8; 
+            
+            border: 4px solid black;
+            border-radius: 8px;
+            position: relative; /* Anchor for absolute children */
+            background-color: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        /* Generic Box Styling */
+        .box {
+            border: 2px solid black;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            background-color: #fff;
+            transition: background-color 0.3s;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        }
+
+        /* Responsive Text Sizing */
+        .box-title { 
+            font-size: clamp(8px, 1.2vw, 16px); 
+            color: #555; 
+            margin-bottom: 5px; 
+            text-align: center;
+        }
+        .box-count { 
+            font-size: clamp(12px, 2.5vw, 28px); 
+            font-weight: bold; 
+        }
+
+        /* --- PERCENTAGE BASED LAYOUT --- */
+        
+        /* White Board: Center Top */
+        #whiteboard {
+            width: 33%; height: 12%;
+            top: 8%; left: 33.5%;
+        }
+
+        /* Lecturer Desk: Middle Right */
+        #lecturer {
+            width: 22%; height: 10%;
+            top: 30%; right: 9%;
+        }
+
+        /* Area 1: Top Left Box */
+        #area_1 {
+            width: 15.5%; height: 20%;
+            top: 50%; left: 9%;
+        }
+
+        /* Area 2: Right of Area 1 */
+        #area_2 {
+            width: 15.5%; height: 20%;
+            top: 50%; left: 26.5%; 
+        }
+
+        /* Area 3: Below Area 1 & 2 (Long strip) */
+        #area_3 {
+            width: 33%; height: 12%;
+            top: 74%; left: 9%;
+        }
+
+        /* Area 4: Top Right Box */
+        #area_4 {
+            width: 27%; height: 10%;
+            top: 50%; right: 9%;
+        }
+
+        /* Area 5: Below Area 4 */
+        #area_5 {
+            width: 27%; height: 20%;
+            top: 64%; right: 9%;
+        }
+
+        /* Door graphic (Scalable Arc) */
+        .door {
+            position: absolute;
+            top: 16%; left: -0.2%;
+            width: 6.6%; height: 12%;
+            border-right: 4px solid #ccc;
+            border-top: 4px solid #ccc;
+            border-radius: 0 100% 0 0;
+            background: white;
+            z-index: 10;
+        }
+        
+        /* Occupied State Styling */
+        .occupied { background-color: #ffcccc; border-color: #cc0000;} 
+        .active { background-color: #e6fffa; border-color: #00aa00;} 
+
+    </style>
+</head>
+<body>
+
+    <div class="room-container">
+        <div class="door"></div>
+
+        <div class="box" id="whiteboard">
+            <span class="box-title" style="font-size: clamp(10px, 2vw, 24px);">White Board</span>
+        </div>
+        <div class="box" id="lecturer">
+            <span class="box-title">Lecturer</span>
+        </div>
+
+        <div class="box" id="area_1">
+            <span class="box-title">Area 1</span>
+            <span class="box-count">...</span>
+        </div>
+        
+        <div class="box" id="area_2">
+            <span class="box-title">Area 2</span>
+            <span class="box-count">...</span>
+        </div>
+
+        <div class="box" id="area_3">
+            <span class="box-title">Area 3</span>
+            <span class="box-count">...</span>
+        </div>
+
+        <div class="box" id="area_4">
+            <span class="box-title">Area 4</span>
+            <span class="box-count">...</span>
+        </div>
+
+        <div class="box" id="area_5">
+            <span class="box-title">Area 5</span>
+            <span class="box-count">...</span>
+        </div>
+    </div>
+
+    <script>
+        function updateOccupancy() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    for (const [key, info] of Object.entries(data)) {
+                        const element = document.getElementById(key);
+                        if (element) {
+                            const countSpan = element.querySelector('.box-count');
+                            countSpan.innerText = `${info.count}/${info.capacity}`;
+
+                            element.classList.remove('occupied', 'active');
+                            if (info.count >= info.capacity) {
+                                element.classList.add('occupied');
+                            } else if (info.count > 0) {
+                                element.classList.add('active');
+                            }
+                        }
+                    }
+                })
+                .catch(err => console.error('Error fetching data:', err));
+        }
+
+        setInterval(updateOccupancy, 200);
+    </script>
+</body>
+</html>
